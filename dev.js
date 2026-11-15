@@ -52,15 +52,62 @@
         const wall = () => new Date(Date.now() + S.off + S.tz * 60000), fmt = () => wall().toISOString().slice(0, 16).replace('T', ' ');
         const tb = (h, r) => { const c = h.map((x, i) => Math.max(x.length, ...r.map(y => String(y[i]).length))); const f = a => a.map((x, i) => i == a.length - 1 ? x : String(x).padEnd(c[i] + 1)).join(''); return '\n' + f(h) + '\n' + f(h.map(x => '-'.repeat(x.length))) + '\n' + r.map(f).join('\n') + '\n' };
         const ukey = n => Object.keys(S.users).find(k => k.toLowerCase() == String(n).toLowerCase());
-        function ask(p, h, sec) { PR.textContent = p; IN.type = sec ? 'password' : 'text'; IN.value = ''; H = h; IN.focus() }
-        IN.onkeydown = e => { if (e.key != 'Enter' || busy || !H) return; const v = IN.value, h = H, s = IN.type == 'password'; OUT.append(PR.textContent + (s ? (mode == 'ps' ? '*'.repeat(v.length) : '') : v) + '\n'); IN.value = ''; h(v) };
+        function escapeHtml(value) { return String(value).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]) }
+        function highlightCommand(value, typo) {
+            let first = true;
+            let offset = 0;
+            return (value.match(/"(?:[^"]|"")*"|'(?:[^']|'')*'|-[\w-]+|\$[\w:]+|\b\d+(?:\.\d+)?\b|\s+|[^\s]+/g) || []).map(token => {
+                const start = offset;
+                offset += token.length;
+                let cls = '';
+                if (/^\s+$/.test(token)) return escapeHtml(token);
+                if (typo && start < typo.end && start + token.length > typo.start) cls = 'ps-error';
+                else if (/^["']/.test(token)) cls = 'ps-string';
+                else if (/^-[\w-]+$/.test(token)) cls = 'ps-param';
+                else if (/^\$/.test(token)) cls = 'ps-variable';
+                else if (/^\d/.test(token)) cls = 'ps-number';
+                else if (first) { cls = 'ps-cmd'; first = false; }
+                return cls ? `<span class="${cls}">${escapeHtml(token)}</span>` : escapeHtml(token);
+            }).join('');
+        }
+        function renderSyntax() {
+            $('#syntax').innerHTML = highlightCommand(IN.value);
+        }
+        function appendCommandEcho(value, typo) {
+            OUT.insertAdjacentHTML('beforeend', `${escapeHtml(PR.textContent)}${highlightCommand(value, typo)}\n`);
+            T.scrollTop = 1e9;
+        }
+        function ask(p, h, sec) {
+            PR.textContent = p;
+            IN.type = sec ? 'password' : 'text';
+            IN.value = '';
+            H = h;
+            ROW.classList.toggle('ps-mode', mode === 'cmd' && !sec);
+            renderSyntax();
+            IN.focus();
+        }
+        IN.addEventListener('input', renderSyntax);
+        IN.onkeydown = e => {
+            if (e.key != 'Enter' || busy || !H) return;
+            const v = IN.value, h = H, s = IN.type == 'password';
+            if (mode === 'cmd' && h === run) {
+                IN.value = '';
+                renderSyntax();
+                h(v);
+                return;
+            }
+            OUT.append(PR.textContent + (s ? (mode == 'ps' ? '*'.repeat(v.length) : '') : v) + '\n');
+            IN.value = '';
+            renderSyntax();
+            h(v);
+        };
         $('#term').onclick = () => { if (!getSelection().toString()) IN.focus() };
         function later(f, ms) { busy = 1; ROW.style.visibility = 'hidden'; setTimeout(() => { busy = 0; ROW.style.visibility = ''; f() }, ms) }
         function seq(q, cb, cancel, i = 0, a = []) { if (i == q.length) return cb(a); ask(q[i][0], v => { if (!i && !v.trim()) return cancel(); seq(q, cb, cancel, i + 1, [...a, v]) }, q[i][1]) }
         const ret = m => { w('\n' + m + '\n'); ask('Press Enter to return to the main menu...', sc) };
         const rs = m => { w('\n' + m); ask('Restart now? (Y)es or (N)o: ', v => /^y/i.test(v) ? reboot() : sc()) };
         function sub(t, items, fn) { clr(); w(t); w(); items.forEach((x, i) => w(' ' + (i + 1) + ') ' + x)); w(); ask('Select option (blank=cancel): ', v => { v = v.trim(); if (!v) return sc(); items[v - 1] ? fn(+v) : sub(t, items, fn) }) }
-        function skin() { $('#win').className = ''; $('#ti').textContent = 'Administrator: C:\\Windows\\system32\\cmd.exe'; $('#t0 span').textContent = 'Windows Server 2025 · ' + S.name }
+        function skin() { $('#win').className = ''; $('#ti').textContent = 'Administrator: Windows PowerShell'; $('#t0 span').textContent = 'Windows Server 2025 PowerShell · ' + S.name }
 
         /* Cheat Sheet PIN Logic */
         function unlockCheat() {
@@ -170,7 +217,7 @@
         const E = () => '='.repeat(79), R = (a, b = '') => ' ' + a.padEnd(38) + b;
         function sc() {
             mode = 'sc'; skin(); clr(); const rd = S.rd ? 'Enabled (' + (S.rd == 1 ? 'more secure' : 'all') + ' clients)' : 'Disabled';
-            [E(), ' '.repeat(23) + 'Welcome to Windows Server 2025 Datacenter', E(), '', R('1) Domain/workgroup:', S.dom ? 'Domain: ' + S.dom : 'Workgroup: ' + S.wg), R('2) Computer name:', S.name), R('3) Add local administrator'), R('4) Remote management:', S.rm ? 'Enabled' : 'Disabled'), '', R('5) Update setting:', S.upd), R('6) Install updates'), R('7) Remote desktop:', rd), '', R('8) Network settings'), R('9) Date and time'), R('10) Telemetry setting:', S.tele), R('11) Windows activation'), '', R('12) Log off user'), R('13) Restart server'), R('14) Shut down server'), R('15) Exit to command line (CMD)'), ''].forEach(l => w(l));
+            [E(), ' '.repeat(23) + 'Welcome to Windows Server 2025 Datacenter', E(), '', R('1) Domain/workgroup:', S.dom ? 'Domain: ' + S.dom : 'Workgroup: ' + S.wg), R('2) Computer name:', S.name), R('3) Add local administrator'), R('4) Remote management:', S.rm ? 'Enabled' : 'Disabled'), '', R('5) Update setting:', S.upd), R('6) Install updates'), R('7) Remote desktop:', rd), '', R('8) Network settings'), R('9) Date and time'), R('10) Telemetry setting:', S.tele), R('11) Windows activation'), '', R('12) Log off user'), R('13) Restart server'), R('14) Shut down server'), R('15) Exit to PowerShell'), ''].forEach(l => w(l));
             ask('Enter number to select an option: ', v => { const f = M[v.trim()]; f ? f() : sc() })
         }
         const yn = (q, f) => ask(q + ' (Y)es or (N)o: ', v => /^y/i.test(v) ? f() : sc());
@@ -199,11 +246,11 @@
             10: () => sub('Telemetry setting: ' + S.tele, ['Security', 'Required', 'Optional'], n => { S.tele = ['Security', 'Required', 'Optional'][n - 1]; ret('Telemetry set to ' + S.tele + '.') }),
             11: () => sub('Windows activation', ['Display license info', 'Activate Windows', 'Install product key'], n => { if (n == 1) ret(' Name: Windows(R), ServerDatacenter edition\n Description: Windows Operating System, TIMEBASED_EVAL channel\n License Status: Initial grace period'); else if (n == 2) { w('\nActivating Windows...'); later(() => ret('Activation failed. Error 0xC004F074: no KMS available.'), 1800) } else seq([['Enter product key (Blank=Cancel): ']], a => ret('Error 0xC004F050: the product key is invalid.'), sc) }),
             12: () => yn('Log off current user?', login), 13: () => yn('Restart the server?', reboot), 14: () => yn('Shut down the server?', () => spin('Shutting down', 1800, off)),
-            15: () => { mode = 'cmd'; skin(); clr(); w('Microsoft Windows [Version 10.0.20348.2402]'); w('(c) Microsoft Corporation. All rights reserved.\n'); pp() }
+            15: () => { mode = 'cmd'; skin(); clr(); w('Windows PowerShell'); w('Copyright (C) Microsoft Corporation. All rights reserved.\n'); pp() }
         };
 
         /* command prompt */
-        const pp = () => ask(curDir + '> ', run), out = t => { w(t); pp() };
+        const pp = () => { mode = 'cmd'; ask('PS ' + curDir + '> ', run) }, out = t => { w(t); pp() };
         const q = (v, k) => { const m = v.match(new RegExp('-' + k + '\\s+(?:"([^"]*)"|\'([^\']*)\'|(\\S+))', 'i')); return m ? (m[1] ?? m[2] ?? m[3]) : null };
         const feat = (ok, txt, key) => { w('\nInstalling...'); later(() => { const had = S[key]; S[key] = 1; out(tb(['Success', 'Restart Needed', 'Exit Code', 'Feature Result'], [['True', 'No', had ? 'NoChangeNeeded' : 'Success', had ? '{}' : txt]])) }, 1800) };
         function forest() {
@@ -249,9 +296,9 @@
             }],
             [n => /^new-localuser /.test(n) && n.includes('-password') && /-name /.test(n), (n, r) => { const nm = q(r, 'Name'); if (ukey(nm)) return out('New-LocalUser : The specified account already exists.'); S.users[nm] = { en: 'True', d: q(r, 'Description') || '', f: q(r, 'FullName') || '', pn: /-passwordneverexpires/.test(n), a: 0 }; out(tb(['Name', 'Enabled', 'Description'], [[nm, 'True', S.users[nm].d]])) }],
             [n => /^net user( \S+)?$/.test(n), (n, r) => { const nm = r.trim().split(/\s+/)[2]; if (!nm) return out('\nUser accounts for \\\\' + S.name + '\n\n' + '-'.repeat(79) + '\n' + Object.keys(S.users).join('   ') + '\nThe command completed successfully.\n'); const k = ukey(nm); if (!k) return out('The user name could not be found.\n\nMore help is available by typing NET HELPMSG 2221.\n'); const u = S.users[k]; out('User name                    ' + k + '\nFull Name                    ' + (u.f || '') + '\nComment                      ' + (u.d || '') + '\nCountry/region code          000 (System Default)\nAccount active               ' + (u.en == 'True' ? 'Yes' : 'No') + '\nAccount expires              Never\n\nPassword last set            ' + fmt() + '\nPassword expires             ' + (u.pn ? 'Never' : '(42 days)') + '\nUser may change password     Yes\nWorkstations allowed         All\nLogon script                 \nLast logon                   Never\n\nLocal Group Memberships      ' + (u.a ? '*Administrators' : '') + '   *Users\nGlobal Group memberships     *None\nThe command completed successfully.\n') }],
-            [n => n.startsWith('add-localgroupmember ') && n.includes('-group "administrators"') && /-member "[^"]+"/.test(n), (n, r) => { const nm = q(r, 'Member'), k = ukey(nm); if (!k) return out('Add-LocalGroupMember : User ' + nm + ' was not found.'); if (S.users[k].a) return out('Add-LocalGroupMember : User ' + k + ' is already a member of group Administrators.'); S.users[k].a = 1; pp() }],
+            [n => n.startsWith('add-localgroupmember ') && q(n, 'Group') && q(n, 'Group').toLowerCase() == 'administrators' && q(n, 'Member'), (n, r) => { const nm = q(r, 'Member'), k = ukey(nm); if (!k) return out('Add-LocalGroupMember : User ' + nm + ' was not found.'); if (S.users[k].a) return out('Add-LocalGroupMember : User ' + k + ' is already a member of group Administrators.'); S.users[k].a = 1; pp() }],
             [n => /^get-localuser( -name \S+)?$/.test(n), (n, r) => { const nm = q(r, 'Name'); if (nm) { const k = ukey(nm); if (!k) return out('Get-LocalUser : User ' + nm + ' was not found.'); return out(tb(['Name', 'Enabled', 'Description'], [[k, S.users[k].en, S.users[k].d]])) } out(tb(['Name', 'Enabled', 'Description'], Object.keys(S.users).map(k => [k, S.users[k].en, S.users[k].d]))) }],
-            [n => /^get-localgroupmember -group "administrators"$/.test(n), () => out(tb(['ObjectClass', 'Name', 'PrincipalSource'], Object.keys(S.users).filter(k => S.users[k].a).map(k => ['User', S.name + '\\' + k, 'Local'])))],
+            [n => n.startsWith('get-localgroupmember') && q(n, 'Group') && q(n, 'Group').toLowerCase() == 'administrators', () => out(tb(['ObjectClass', 'Name', 'PrincipalSource'], Object.keys(S.users).filter(k => S.users[k].a).map(k => ['User', S.name + '\\' + k, 'Local'])))],
             [n => n.startsWith('install-windowsfeature') && n.includes('ad-domain-services'), () => feat(0, '{Active Directory Domain Services, Group Policy Management, Remote Server Administration Tools, Role Administration Tools...}', 'adds')],
             [n => n.startsWith('install-windowsfeature') && n.includes('web-server'), () => feat(0, '{Web Server (IIS), Web Server, Common HTTP Features, Default Document, Directory Browsing, HTTP Errors, Static Content...}', 'web')],
             [n => n == 'install-addsforest', forest],
@@ -301,7 +348,126 @@
             /* ----------------------------- */
             [n => n.startsWith('new-smbshare ') && /-name /.test(n) && /-path /.test(n), (n, r) => { const nm = q(r, 'Name'); if (S.shares.some(s => s.toLowerCase() == nm.toLowerCase())) return out('New-SmbShare : The name has already been shared.'); S.shares.push(nm); S.sp = S.sp || {}; S.sp[nm.toLowerCase()] = q(r, 'Path'); out(tb(['Name', 'ScopeName', 'Path', 'Description'], [[nm, '*', q(r, 'Path'), '']])) }],
             [n => n == 'get-smbshare', () => out(tb(['Name', 'ScopeName', 'Path', 'Description'], [['ADMIN$', '*', 'C:\\Windows', 'Remote Admin'], ['C$', '*', 'C:\\', 'Default share'], ['IPC$', '*', '', 'Remote IPC'], ...S.shares.map(s => [s, '*', S.sp[s.toLowerCase()], ''])]))]];
-        function run(v) { const r = v.replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/`\s*/g, ' ').trim(), n = r.replace(/\s+/g, ' ').toLowerCase().replace(/'/g, '"'); if (!n) return pp(); const c = CMDS.find(c => c[0](n)); if (!c) { w('Command does not exist.'); return pp() } c[1](n, r) }
+        const CMDLET_SPECS = {
+            'new-localuser': { required: ['Name', 'Password'], allowed: ['Name', 'FullName', 'Description', 'Password', 'PasswordNeverExpires', 'AccountNeverExpires', 'AsPlainText', 'Force'], secret: ['Password'] },
+            'new-adorganizationalunit': { required: ['Name', 'Path'], allowed: ['Name', 'Path'] },
+            'new-aduser': { required: ['Name', 'Path'], allowed: ['Name', 'Path', 'GivenName', 'Surname', 'SamAccountName', 'Enabled', 'AccountPassword'] },
+            'new-gpo': { required: ['Name'], allowed: ['Name', 'Comment', 'Domain'] },
+            'new-gpofolderredirection': { required: ['Name', 'Path', 'Access'], allowed: ['Name', 'Path', 'Access'] },
+            'new-gpodrivemap': { required: ['Name', 'Drive', 'Path'], allowed: ['Name', 'Drive', 'Path'] },
+            'new-smbshare': { required: ['Name', 'Path'], allowed: ['Name', 'Path', 'FullAccess', 'ReadAccess', 'ChangeAccess', 'Description'] },
+            'add-localgroupmember': { required: ['Group', 'Member'], allowed: ['Group', 'Member'] },
+            'install-windowsfeature': { required: ['Name'], allowed: ['Name', 'IncludeManagementTools', 'Restart', 'ComputerName'] }
+        };
+        const KNOWN_COMMANDS = ['sconfig', 'cls', 'clear', 'exit', 'hostname', 'whoami', 'get-date', 'ipconfig', 'invoke-webrequest', 'cd', 'dir', 'ls', 'notepad.exe', 'net', 'get-localuser', 'get-localgroupmember', 'install-windowsfeature', 'install-addsforest', 'new-localuser', 'add-localgroupmember', 'new-adorganizationalunit', 'new-aduser', 'new-gpo', 'new-gpofolderredirection', 'new-gpodrivemap', 'new-smbshare', 'get-smbshare'];
+        const COMMAND_LABELS = {
+            'get-date': 'Get-Date', 'get-localuser': 'Get-LocalUser', 'get-localgroupmember': 'Get-LocalGroupMember',
+            'install-windowsfeature': 'Install-WindowsFeature', 'install-addsforest': 'Install-ADDSForest',
+            'new-localuser': 'New-LocalUser', 'add-localgroupmember': 'Add-LocalGroupMember',
+            'new-adorganizationalunit': 'New-ADOrganizationalUnit', 'new-aduser': 'New-ADUser',
+            'new-gpo': 'New-GPO', 'new-gpofolderredirection': 'New-GPOFolderRedirection',
+            'new-gpodrivemap': 'New-GPODriveMap', 'new-smbshare': 'New-SmbShare', 'get-smbshare': 'Get-SmbShare'
+        };
+        function parseParameters(command) {
+            const params = new Map();
+            const tokens = [];
+            const tokenPattern = /"(?:[^"]|"")*"|'(?:[^']|'')*'|\S+/g;
+            let match;
+            while ((match = tokenPattern.exec(command))) tokens.push({ value: match[0], index: match.index });
+            for (let i = 1; i < tokens.length; i++) {
+                const parameter = tokens[i].value.match(/^-([\w-]+)$/);
+                if (!parameter) continue;
+                const next = tokens[i + 1];
+                const value = next && !next.value.startsWith('-') ? next.value : undefined;
+                params.set(parameter[1].toLowerCase(), { name: parameter[1], value, index: tokens[i].index });
+            }
+            return params;
+        }
+        function editDistance(a, b) {
+            const row = Array.from({ length: b.length + 1 }, (_, i) => i);
+            for (let i = 1; i <= a.length; i++) {
+                let diagonal = row[0];
+                row[0] = i;
+                for (let j = 1; j <= b.length; j++) {
+                    const above = row[j];
+                    row[j] = Math.min(row[j] + 1, row[j - 1] + 1, diagonal + (a[i - 1] === b[j - 1] ? 0 : 1));
+                    diagonal = above;
+                }
+            }
+            return row[b.length];
+        }
+        function closestMatch(value, options) {
+            let best = null, bestDistance = Infinity;
+            for (const option of options) {
+                const distance = editDistance(value.toLowerCase(), option.toLowerCase());
+                if (distance < bestDistance) { best = option; bestDistance = distance; }
+            }
+            return bestDistance <= Math.max(2, Math.floor(value.length * 0.28)) ? best : null;
+        }
+        function replaceOrAppendParameter(command, name, value) {
+            const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const pattern = new RegExp('(^|\\s)-' + escapedName + '(?:\\s+("(?:[^"]|"")*"|\\' + "'(?:[^']|'')*'" + '|(?!-)\\S+))?', 'i');
+            const replacement = '$1-' + name + ' "' + value.replace(/"/g, '`"') + '"';
+            return pattern.test(command) ? command.replace(pattern, replacement) : command + ' -' + name + ' "' + value.replace(/"/g, '`"') + '"';
+        }
+        function dispatchCommand(command) {
+            const normalized = command.replace(/\s+/g, ' ').toLowerCase().replace(/'/g, '"');
+            const handler = CMDS.find(item => item[0](normalized));
+            if (!handler) {
+                w('The command is recognized, but this lab simulator does not support that command or parameter combination.');
+                return pp();
+            }
+            handler[1](normalized, command);
+        }
+        function run(value) {
+            const command = value.replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/`\s*/g, ' ').trim();
+            if (!command) { appendCommandEcho(value); return pp(); }
+            const inputOffset = value.length - value.trimStart().length;
+            const commandMatch = command.match(/^(\S+)/);
+            const commandName = commandMatch ? commandMatch[1] : '';
+            const commandKey = commandName.toLowerCase();
+            const spec = CMDLET_SPECS[commandKey];
+            const known = KNOWN_COMMANDS.includes(commandKey);
+            if (!known) {
+                const suggestion = closestMatch(commandName, KNOWN_COMMANDS);
+                appendCommandEcho(value, { start: inputOffset, end: inputOffset + commandName.length });
+                w(suggestion
+                    ? `The term '${commandName}' is not recognized. Did you mean '${COMMAND_LABELS[suggestion] || suggestion}'?`
+                    : `The term '${commandName}' is not recognized as a command. Check the command name and try again.`);
+                return pp();
+            }
+            const params = parseParameters(command);
+            if (spec) {
+                const allowed = new Set(spec.allowed.map(name => name.toLowerCase()));
+                const invalid = [...params.entries()].find(([name]) => !allowed.has(name));
+                if (invalid) {
+                    const [badName, details] = invalid;
+                    const suggestion = closestMatch(badName, spec.allowed);
+                    appendCommandEcho(value, { start: inputOffset + details.index, end: inputOffset + details.index + details.name.length + 1 });
+                    w(suggestion
+                        ? `${commandName} : A parameter cannot be found that matches parameter name '${details.name}'. Did you mean '-${suggestion}'?`
+                        : `${commandName} : A parameter cannot be found that matches parameter name '${details.name}'.`);
+                    return pp();
+                }
+                const missing = spec.required.filter(name => {
+                    const parameter = params.get(name.toLowerCase());
+                    return !parameter || parameter.value === undefined;
+                });
+                if (missing.length) {
+                    appendCommandEcho(value);
+                    w(`\ncmdlet ${commandName} at command pipeline position 1\nSupply values for the following parameters:`);
+                    return seq(missing.map(name => [`${name}: `, (spec.secret || []).includes(name) ? 1 : 0]), answers => {
+                        let completed = command;
+                        missing.forEach((name, index) => {
+                            completed = replaceOrAppendParameter(completed, name, answers[index].trim());
+                        });
+                        dispatchCommand(completed);
+                    }, pp);
+                }
+            }
+            appendCommandEcho(value);
+            dispatchCommand(command);
+        }
 
         /* --- Client Windows & Explorer --- */
         let activeWindowZ = 10;

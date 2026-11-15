@@ -140,6 +140,24 @@ body {
     align-items: flex-end
 }
 
+#in-wrap {
+    position: relative;
+    flex: 1;
+    min-width: 4ch
+}
+
+#syntax {
+    display: none;
+    position: absolute;
+    inset: 0;
+    white-space: pre;
+    pointer-events: none
+}
+
+#row.ps-mode #syntax {
+    display: block
+}
+
 #pr {
     white-space: pre-wrap
 }
@@ -153,6 +171,46 @@ body {
     color: inherit;
     font: inherit;
     padding: 0
+}
+
+#row.ps-mode #in {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    color: transparent;
+    caret-color: #ccc;
+    background: transparent
+}
+
+#row.ps-mode #in::selection {
+    color: transparent;
+    background: #264f78
+}
+
+.ps-cmd {
+    color: #dcdcaa
+}
+
+.ps-param {
+    color: #9cdcfe
+}
+
+.ps-string {
+    color: #ce9178
+}
+
+.ps-variable {
+    color: #4ec9b0
+}
+
+.ps-number {
+    color: #b5cea8
+}
+
+.ps-error {
+    color: #f48771;
+    text-decoration: underline wavy #f14c4c;
+    text-underline-offset: 3px
 }
 
 #ov {
