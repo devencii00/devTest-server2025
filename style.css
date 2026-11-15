@@ -183,33 +183,76 @@ body {
 }
 
 #row.ps-mode #in::selection {
-    color: transparent;
-    background: #264f78
+    color: #000;
+    background: #c0c0c0
+}
+
+.ps-default {
+    color: #d4d4d4
+}
+
+#syntax {
+    color: #d4d4d4
 }
 
 .ps-cmd {
-    color: #dcdcaa
+    color: #ffff00
 }
 
 .ps-param {
-    color: #9cdcfe
+    color: #808080
 }
 
 .ps-string {
-    color: #ce9178
+    color: #00ffff
 }
 
 .ps-variable {
-    color: #4ec9b0
+    color: #00ff00
 }
 
 .ps-number {
-    color: #b5cea8
+    color: #ffffff
+}
+
+.ps-keyword {
+    color: #00ff00
+}
+
+.ps-comment {
+    color: #008000
+}
+
+.ps-operator {
+    color: #808080
+}
+
+.ps-member,
+.ps-type {
+    color: #d4d4d4
+}
+
+.ps-emphasis {
+    color: #00ffff
+}
+
+.ps-continuation {
+    color: #d4d4d4
+}
+
+.ps-inline-prediction {
+    color: #ffffff;
+    opacity: .45;
+    font-style: italic
+}
+
+.ps-list-prediction {
+    color: #ffff00
 }
 
 .ps-error {
-    color: #f48771;
-    text-decoration: underline wavy #f14c4c;
+    color: #ff0000;
+    text-decoration: underline wavy #ff0000;
     text-underline-offset: 3px
 }
 

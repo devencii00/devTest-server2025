@@ -54,20 +54,53 @@
         const ukey = n => Object.keys(S.users).find(k => k.toLowerCase() == String(n).toLowerCase());
         function escapeHtml(value) { return String(value).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]) }
         function highlightCommand(value, typo) {
-            let first = true;
+            const keywords = new Set(['begin', 'break', 'catch', 'continue', 'else', 'elseif', 'end', 'exit', 'filter', 'finally', 'for', 'foreach', 'function', 'if', 'in', 'param', 'process', 'return', 'switch', 'throw', 'trap', 'try', 'while']);
+            const operators = new Set(['-and', '-as', '-band', '-bor', '-contains', '-eq', '-ge', '-gt', '-is', '-like', '-lt', '-match', '-ne', '-not', '-or', '-replace', '-shl', '-shr']);
+            const isClosedString = token => {
+                if (token[0] === '"') {
+                    if (!token.endsWith('"')) return false;
+                    let escapes = 0;
+                    for (let i = token.length - 2; i >= 0 && token[i] === '`'; i--) escapes++;
+                    return escapes % 2 === 0;
+                }
+                if (token[0] === "'") {
+                    if (!token.endsWith("'")) return false;
+                    let quotes = 0;
+                    for (let i = token.length - 1; i >= 0 && token[i] === "'"; i--) quotes++;
+                    return quotes % 2 === 1;
+                }
+                return true;
+            };
+            const command = value.match(/^(\s*)(\S+)/);
+            let output = '';
             let offset = 0;
-            return (value.match(/"(?:[^"]|"")*"|'(?:[^']|'')*'|-[\w-]+|\$[\w:]+|\b\d+(?:\.\d+)?\b|\s+|[^\s]+/g) || []).map(token => {
+            if (command && !['#', '"', "'", '$', '['].includes(command[2][0]) && !/^\d/.test(command[2])) {
+                output += escapeHtml(command[1]);
+                offset = command[1].length;
+                const commandClass = typo && offset < typo.end && offset + command[2].length > typo.start
+                    ? 'ps-error'
+                    : keywords.has(command[2].toLowerCase()) ? 'ps-keyword' : 'ps-cmd';
+                output += `<span class="${commandClass}">${escapeHtml(command[2])}</span>`;
+                offset += command[2].length;
+            }
+            return output + (value.slice(offset).match(/"(?:`.|[^"`])*"?|'(?:''|[^'])*'?|#[^\r\n]*|\[[A-Za-z_][\w.]*\]|\$[\w:]+|\.[A-Za-z_]\w*|-[\w-]+|\b\d+(?:\.\d+)?\b|\s+|[()[\]{};,|&=+*/%!<>:]+|[^\s]+/g) || []).map(token => {
                 const start = offset;
                 offset += token.length;
                 let cls = '';
                 if (/^\s+$/.test(token)) return escapeHtml(token);
                 if (typo && start < typo.end && start + token.length > typo.start) cls = 'ps-error';
-                else if (/^["']/.test(token)) cls = 'ps-string';
+                else if (/^["']/.test(token)) cls = isClosedString(token) ? 'ps-string' : 'ps-error';
+                else if (/^#/.test(token)) cls = 'ps-comment';
+                else if (/^\[[A-Za-z_][\w.]*\]$/.test(token)) cls = 'ps-type';
+                else if (/^-[\w-]+$/.test(token) && operators.has(token.toLowerCase())) cls = 'ps-operator';
                 else if (/^-[\w-]+$/.test(token)) cls = 'ps-param';
                 else if (/^\$/.test(token)) cls = 'ps-variable';
+                else if (/^\.[A-Za-z_]\w*$/.test(token)) cls = 'ps-member';
                 else if (/^\d/.test(token)) cls = 'ps-number';
-                else if (first) { cls = 'ps-cmd'; first = false; }
-                return cls ? `<span class="${cls}">${escapeHtml(token)}</span>` : escapeHtml(token);
+                else if (keywords.has(token.toLowerCase())) cls = 'ps-keyword';
+                else if (/^[()[\]{};,|&=+*/%!<>.:]+$/.test(token)) cls = 'ps-operator';
+                else cls = 'ps-default';
+                return `<span class="${cls}">${escapeHtml(token)}</span>`;
             }).join('');
         }
         function renderSyntax() {
