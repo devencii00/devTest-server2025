@@ -252,15 +252,26 @@
         /* command prompt */
         const pp = () => { mode = 'cmd'; ask('PS ' + curDir + '> ', run) }, out = t => { w(t); pp() };
         const q = (v, k) => { const m = v.match(new RegExp('-' + k + '\\s+(?:"([^"]*)"|\'([^\']*)\'|(\\S+))', 'i')); return m ? (m[1] ?? m[2] ?? m[3]) : null };
+        const positionalValue = (command, key) => {
+            if (key !== 'invoke-webrequest') return null;
+            const match = command.match(/^invoke-webrequest\s+(?:"(https?:\/\/[^"]+)"|'(https?:\/\/[^']+)'|(https?:\/\/\S+))/i);
+            return match ? (match[1] || match[2] || match[3]) : null;
+        };
+        const commandHasPositionalValue = (command, key) => !!positionalValue(command, key);
         const feat = (ok, txt, key) => { w('\nInstalling...'); later(() => { const had = S[key]; S[key] = 1; out(tb(['Success', 'Restart Needed', 'Exit Code', 'Feature Result'], [['True', 'No', had ? 'NoChangeNeeded' : 'Success', had ? '{}' : txt]])) }, 1800) };
-        function forest() {
+        function forest(command) {
             if (!S.adds) return out('Install-ADDSForest : The AD DS role is not installed. Run Install-WindowsFeature AD-Domain-Services first.'); if (S.dc) return out('Install-ADDSForest : This server is already a domain controller.');
+            const domainName = q(command, 'DomainName');
+            const prompt = [];
+            if (!domainName) prompt.push(['DomainName: ']);
+            prompt.push(['SafeModeAdministratorPassword: ', 1], ['Confirm SafeModeAdministratorPassword: ', 1]);
             w('\ncmdlet Install-ADDSForest at command pipeline position 1\nSupply values for the following parameters:');
-            seq([['DomainName: '], ['SafeModeAdministratorPassword: ', 1], ['Confirm SafeModeAdministratorPassword: ', 1]], a => {
-                const d = a[0].trim().toLowerCase();
+            seq(prompt, a => {
+                const d = (domainName || a[0]).trim().toLowerCase();
+                const passwordIndex = domainName ? 0 : 1;
                 if (!/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(d)) return out('Install-ADDSForest : The domain name is not valid (example: srv.world).');
-                if (a[1] != a[2]) return out('Install-ADDSForest : The passwords do not match.');
-                if (a[1].length < 8) return out('Install-ADDSForest : The password does not meet the complexity requirements.');
+                if (a[passwordIndex] != a[passwordIndex + 1]) return out('Install-ADDSForest : The passwords do not match.');
+                if (a[passwordIndex].length < 8) return out('Install-ADDSForest : The password does not meet the complexity requirements.');
                 ask('\nThe target server will be configured as a domain controller and restarted when this operation is complete.\nDo you want to continue with this operation?\n[Y] Yes  [A] Yes to All  [N] No  [L] No to All  [S] Suspend  [?] Help (default is "Y"): ', v => {
                     if (/^[nls]/i.test(v)) return pp();
                     w('\nWARNING: A delegation for this DNS server cannot be created because the authoritative parent zone cannot be found or it does not run Windows DNS server.\n\nPromoting this server to a domain controller...');
@@ -269,11 +280,11 @@
             }, pp)
         }
         const CMDS = [
-            [n => n == 'sconfig', sc], [n => n == 'cls' || n == 'clear', () => { clr(); pp() }], [n => n == 'exit', sc],
+            [n => n == 'sconfig', sc], [n => n == 'clear-host' || n == 'cls' || n == 'clear', () => { clr(); pp() }], [n => n == 'exit', sc],
             [n => n == 'hostname', () => out(S.name)], [n => n == 'whoami', () => out(S.name.toLowerCase() + '\\administrator')],
             [n => n == 'get-date', () => out('\n' + wall().toLocaleString('en-US', { timeZone: 'UTC', dateStyle: 'full', timeStyle: 'medium' }) + '\n')],
             [n => n == 'ipconfig', () => out('\nWindows IP Configuration\n\nEthernet adapter Ethernet:\n\n   Connection-specific DNS Suffix  . : \n   IPv4 Address. . . . . . . . . . . : ' + sip() + '\n   Subnet Mask . . . . . . . . . . . : ' + S.mask + '\n   Default Gateway . . . . . . . . . : ' + S.gw + '\n')],
-            [n => n == 'invoke-webrequest http://localhost', () => {
+            [n => n.startsWith('invoke-webrequest ') && (q(n, 'Uri') || positionalValue(n, 'invoke-webrequest')), (n, r) => {
                 if (!S.web) return out('Invoke-WebRequest : Unable to connect to the remote server');
                 S.iisVerified = 1;
                 out(`\nStatusCode        : 200\nStatusDescription : OK\nContent           : <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">\n                    <html xmlns="http://www.w3.org/1999/xhtml">\n                    <head>\n                    <meta http-equiv="Content-Type" cont...\nRawContent        : HTTP/1.1 200 OK\n                    Accept-Ranges: bytes\n                    Content-Length: 703\n                    Content-Type: text/html\n                    Date: Tue, 25 Jan 2022 05:29:35 GMT\n                    ETag: "26b38758ac11d81:0"\n                    Last-Modified: Tue, 25 Jan 2022 05:28:12 GMT\n                    Serve...\nForms             : {}\nHeaders           : {[Accept-Ranges, bytes], [Content-Length, 703], [Content-Type, text/html], [Date, Tue, 25 Jan 2022 05:29:35 GMT]...}\nImages            : {@{innerHTML=; innerText=; outerHTML=<IMG alt=IIS src="iisstart.png" width=960 height=600>; outerText=; tagName=IMG; alt=IIS; src=iisstart.png; width=960; height=600}}\nInputFields       : {}\nLinks             : {@{innerHTML=<IMG alt=IIS src="iisstart.png" width=960 height=600>; innerText=; outerHTML=<A href="http://go.microsoft.com/fwlink/?linkid=66138&clcid=0x409"><IMG alt=IIS src="iisstart.png" width=960 height=600></A>; outerText=; tagName=A; href=http://go.microsoft.com/fwlink/?linkid=66138&clcid=0x409}}\nParsedHtml        : System.__ComObject\nRawContentLength  : 703`);
@@ -284,7 +295,7 @@
                 else if (p === '..') { curDir = 'C:\\Users\\Administrator'; pp(); }
                 else { out('The system cannot find the path specified.'); }
             }],
-            [n => n == 'ls' || n == 'dir', () => {
+            [n => n == 'get-childitem' || n == 'ls' || n == 'dir', () => {
                 if (curDir === 'C:\\inetpub\\wwwroot') {
                     out('\n Directory of C:\\inetpub\\wwwroot\n\n01/25/2022  05:28 AM    <DIR>          .\n01/25/2022  05:28 AM    <DIR>          ..\n01/25/2022  05:28 AM               703 iisstart.htm\n01/25/2022  05:28 AM            99,150 iisstart.png\n01/25/2022  05:28 AM                12 index.html\n               3 File(s)        100,065 bytes\n               2 Dir(s)  42,123,456,789 bytes free\n');
                 } else {
@@ -301,7 +312,7 @@
             [n => n.startsWith('get-localgroupmember') && q(n, 'Group') && q(n, 'Group').toLowerCase() == 'administrators', () => out(tb(['ObjectClass', 'Name', 'PrincipalSource'], Object.keys(S.users).filter(k => S.users[k].a).map(k => ['User', S.name + '\\' + k, 'Local'])))],
             [n => n.startsWith('install-windowsfeature') && n.includes('ad-domain-services'), () => feat(0, '{Active Directory Domain Services, Group Policy Management, Remote Server Administration Tools, Role Administration Tools...}', 'adds')],
             [n => n.startsWith('install-windowsfeature') && n.includes('web-server'), () => feat(0, '{Web Server (IIS), Web Server, Common HTTP Features, Default Document, Directory Browsing, HTTP Errors, Static Content...}', 'web')],
-            [n => n == 'install-addsforest', forest],
+            [n => n.startsWith('install-addsforest'), (n, r) => forest(r)],
 
             /* Activity 2 Commands with Pre-requisite Checks */
             [n => n.startsWith('new-adorganizationalunit'), (n, r) => {
@@ -349,6 +360,7 @@
             [n => n.startsWith('new-smbshare ') && /-name /.test(n) && /-path /.test(n), (n, r) => { const nm = q(r, 'Name'); if (S.shares.some(s => s.toLowerCase() == nm.toLowerCase())) return out('New-SmbShare : The name has already been shared.'); S.shares.push(nm); S.sp = S.sp || {}; S.sp[nm.toLowerCase()] = q(r, 'Path'); out(tb(['Name', 'ScopeName', 'Path', 'Description'], [[nm, '*', q(r, 'Path'), '']])) }],
             [n => n == 'get-smbshare', () => out(tb(['Name', 'ScopeName', 'Path', 'Description'], [['ADMIN$', '*', 'C:\\Windows', 'Remote Admin'], ['C$', '*', 'C:\\', 'Default share'], ['IPC$', '*', '', 'Remote IPC'], ...S.shares.map(s => [s, '*', S.sp[s.toLowerCase()], ''])]))]];
         const CMDLET_SPECS = {
+            'invoke-webrequest': { required: ['Uri'], allowed: ['Uri'], positional: ['Uri'] },
             'new-localuser': { required: ['Name', 'Password'], allowed: ['Name', 'FullName', 'Description', 'Password', 'PasswordNeverExpires', 'AccountNeverExpires', 'AsPlainText', 'Force'], secret: ['Password'] },
             'new-adorganizationalunit': { required: ['Name', 'Path'], allowed: ['Name', 'Path'] },
             'new-aduser': { required: ['Name', 'Path'], allowed: ['Name', 'Path', 'GivenName', 'Surname', 'SamAccountName', 'Enabled', 'AccountPassword'] },
@@ -357,10 +369,12 @@
             'new-gpodrivemap': { required: ['Name', 'Drive', 'Path'], allowed: ['Name', 'Drive', 'Path'] },
             'new-smbshare': { required: ['Name', 'Path'], allowed: ['Name', 'Path', 'FullAccess', 'ReadAccess', 'ChangeAccess', 'Description'] },
             'add-localgroupmember': { required: ['Group', 'Member'], allowed: ['Group', 'Member'] },
-            'install-windowsfeature': { required: ['Name'], allowed: ['Name', 'IncludeManagementTools', 'Restart', 'ComputerName'] }
+            'install-windowsfeature': { required: ['Name'], allowed: ['Name', 'IncludeManagementTools', 'Restart', 'ComputerName'] },
+            'install-addsforest': { required: ['DomainName'], allowed: ['DomainName', 'SafeModeAdministratorPassword', 'InstallDns', 'CreateDnsDelegation', 'NoRebootOnCompletion', 'Force'], secret: ['SafeModeAdministratorPassword'] }
         };
-        const KNOWN_COMMANDS = ['sconfig', 'cls', 'clear', 'exit', 'hostname', 'whoami', 'get-date', 'ipconfig', 'invoke-webrequest', 'cd', 'dir', 'ls', 'notepad.exe', 'net', 'get-localuser', 'get-localgroupmember', 'install-windowsfeature', 'install-addsforest', 'new-localuser', 'add-localgroupmember', 'new-adorganizationalunit', 'new-aduser', 'new-gpo', 'new-gpofolderredirection', 'new-gpodrivemap', 'new-smbshare', 'get-smbshare'];
+        const KNOWN_COMMANDS = ['sconfig', 'clear-host', 'cls', 'clear', 'exit', 'hostname', 'whoami', 'get-date', 'ipconfig', 'invoke-webrequest', 'cd', 'get-childitem', 'dir', 'ls', 'notepad.exe', 'net', 'get-localuser', 'get-localgroupmember', 'install-windowsfeature', 'install-addsforest', 'new-localuser', 'add-localgroupmember', 'new-adorganizationalunit', 'new-aduser', 'new-gpo', 'new-gpofolderredirection', 'new-gpodrivemap', 'new-smbshare', 'get-smbshare'];
         const COMMAND_LABELS = {
+            'invoke-webrequest': 'Invoke-WebRequest', 'get-childitem': 'Get-ChildItem', 'clear-host': 'Clear-Host',
             'get-date': 'Get-Date', 'get-localuser': 'Get-LocalUser', 'get-localgroupmember': 'Get-LocalGroupMember',
             'install-windowsfeature': 'Install-WindowsFeature', 'install-addsforest': 'Install-ADDSForest',
             'new-localuser': 'New-LocalUser', 'add-localgroupmember': 'Add-LocalGroupMember',
@@ -368,6 +382,7 @@
             'new-gpo': 'New-GPO', 'new-gpofolderredirection': 'New-GPOFolderRedirection',
             'new-gpodrivemap': 'New-GPODriveMap', 'new-smbshare': 'New-SmbShare', 'get-smbshare': 'Get-SmbShare'
         };
+        const COMMAND_ALIASES = { iwr: 'invoke-webrequest', curl: 'invoke-webrequest', gci: 'get-childitem', ls: 'get-childitem', dir: 'get-childitem', clear: 'clear-host', cls: 'clear-host', clr: 'clear-host', date: 'get-date' };
         function parseParameters(command) {
             const params = new Map();
             const tokens = [];
@@ -424,19 +439,24 @@
             if (!command) { appendCommandEcho(value); return pp(); }
             const inputOffset = value.length - value.trimStart().length;
             const commandMatch = command.match(/^(\S+)/);
-            const commandName = commandMatch ? commandMatch[1] : '';
-            const commandKey = commandName.toLowerCase();
+            const enteredCommandName = commandMatch ? commandMatch[1] : '';
+            const enteredCommandKey = enteredCommandName.toLowerCase();
+            const commandKey = COMMAND_ALIASES[enteredCommandKey] || enteredCommandKey;
+            const commandName = COMMAND_LABELS[commandKey] || (commandKey === enteredCommandKey ? enteredCommandName : commandKey);
+            const normalizedCommand = commandKey === enteredCommandKey
+                ? command
+                : command.replace(/^\S+/, commandName);
             const spec = CMDLET_SPECS[commandKey];
             const known = KNOWN_COMMANDS.includes(commandKey);
             if (!known) {
-                const suggestion = closestMatch(commandName, KNOWN_COMMANDS);
-                appendCommandEcho(value, { start: inputOffset, end: inputOffset + commandName.length });
+                const suggestion = closestMatch(enteredCommandName, KNOWN_COMMANDS);
+                appendCommandEcho(value, { start: inputOffset, end: inputOffset + enteredCommandName.length });
                 w(suggestion
                     ? `The term '${commandName}' is not recognized. Did you mean '${COMMAND_LABELS[suggestion] || suggestion}'?`
                     : `The term '${commandName}' is not recognized as a command. Check the command name and try again.`);
                 return pp();
             }
-            const params = parseParameters(command);
+            const params = parseParameters(normalizedCommand);
             if (spec) {
                 const allowed = new Set(spec.allowed.map(name => name.toLowerCase()));
                 const invalid = [...params.entries()].find(([name]) => !allowed.has(name));
@@ -451,13 +471,14 @@
                 }
                 const missing = spec.required.filter(name => {
                     const parameter = params.get(name.toLowerCase());
+                    if (!parameter && spec.positional && spec.positional.includes(name) && commandHasPositionalValue(normalizedCommand, commandKey)) return false;
                     return !parameter || parameter.value === undefined;
                 });
                 if (missing.length) {
                     appendCommandEcho(value);
                     w(`\ncmdlet ${commandName} at command pipeline position 1\nSupply values for the following parameters:`);
                     return seq(missing.map(name => [`${name}: `, (spec.secret || []).includes(name) ? 1 : 0]), answers => {
-                        let completed = command;
+                        let completed = normalizedCommand;
                         missing.forEach((name, index) => {
                             completed = replaceOrAppendParameter(completed, name, answers[index].trim());
                         });
@@ -466,7 +487,7 @@
                 }
             }
             appendCommandEcho(value);
-            dispatchCommand(command);
+            dispatchCommand(normalizedCommand);
         }
 
         /* --- Client Windows & Explorer --- */

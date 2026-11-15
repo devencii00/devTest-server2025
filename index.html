@@ -62,7 +62,7 @@
                     PIN</span>
             </div>
             <pre id="cheat-content" style="display:none; margin-top:10px;">## Basic Setup (Activity 1)
-New-LocalUser -Name "SysAd" -FullName "System Administrator" -Description "Administrator of this Computer" -Password (ConvertTo-SecureString -AsPlainText "P@ssw0rd01" -Force) -PasswordNeverExpires -AccountNeverExpires
+New-LocalUser -Name "SysAd" -FullName "System Administrator" -Description "Administrator of this Computer" -Password "P@ssw0rd01" -PasswordNeverExpires -AccountNeverExpires
 Net User SysAd
 Add-LocalGroupMember -Group "Administrators" -Member "SysAd"
 Install-WindowsFeature -name AD-Domain-Services -IncludeManagementTools
