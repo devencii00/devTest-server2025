@@ -5,6 +5,44 @@
             ous: [], adUsers: [], gpos: [],
             users: { Administrator: { en: 'True', d: 'Built-in account for administering the computer/domain', a: 1, f: '' }, DefaultAccount: { en: 'False', d: 'A user account managed by the system.' }, Guest: { en: 'False', d: 'Built-in account for guest access to the computer/domain' }, WDAGUtilityAccount: { en: 'False', d: 'A user account managed and used by the system for Windows Defender Application Guard scenarios.' } }
         };
+        const LAB_STORAGE_KEY = 'serverLabState';
+        let restoredTrackerTask = 0;
+        let resettingLab = false;
+        try {
+            const stored = localStorage.getItem(LAB_STORAGE_KEY);
+            if (stored) {
+                const saved = JSON.parse(stored);
+                if (saved && typeof saved === 'object' && saved.state && typeof saved.state === 'object') {
+                    Object.keys(saved.state).forEach(key => {
+                        if (key in S && key !== 'users') S[key] = saved.state[key];
+                    });
+                    if (saved.state.users && typeof saved.state.users === 'object') {
+                        S.users = { ...S.users, ...saved.state.users };
+                    }
+                    if (saved.state.sp && typeof saved.state.sp === 'object') S.sp = saved.state.sp;
+                    if (saved.trackerTask === 1 || saved.trackerTask === 2) restoredTrackerTask = saved.trackerTask;
+                }
+            }
+        } catch (error) {
+            console.error('Unable to restore the saved lab progress.', error);
+        }
+        function saveLabState() {
+            if (resettingLab) return;
+            try {
+                localStorage.setItem(LAB_STORAGE_KEY, JSON.stringify({ state: S, trackerTask: currentTask }));
+            } catch (error) {
+                console.error('Unable to save the lab progress.', error);
+            }
+        }
+        function resetLab() {
+            resettingLab = true;
+            try {
+                localStorage.removeItem(LAB_STORAGE_KEY);
+            } catch (error) {
+                console.error('Unable to clear the saved lab progress.', error);
+            }
+            location.reload();
+        }
         const TZ = [['(UTC-08:00) Pacific Time (US & Canada)', -480], ['(UTC-05:00) Eastern Time (US & Canada)', -300], ['(UTC) Coordinated Universal Time', 0], ['(UTC+08:00) Kuala Lumpur, Singapore', 480]];
         const T = $('#term'), IN = $('#in'), PR = $('#pr'), OUT = $('#out'), ROW = $('#row'), O = $('#ov');
         let H = null, busy = 0, mode = 'sc', curDir = 'C:\\Users\\Administrator';
@@ -511,12 +549,18 @@
         document.addEventListener('click', e => { if (!e.target.closest('#sp')) $('#sp').classList.remove('o') });
 
         /* Task Tracker Logic */
-        let currentTask = 0;
+        let currentTask = restoredTrackerTask;
         function startTracker(taskId) {
             currentTask = taskId;
             $('#tracker').style.display = 'block';
             $('#tracker-title').textContent = `Activity ${taskId} Tracker`;
             updateTracker();
+            saveLabState();
+        }
+        function closeTracker() {
+            currentTask = 0;
+            $('#tracker').style.display = 'none';
+            saveLabState();
         }
         function updateTracker() {
             if (!currentTask || $('#tracker').style.display === 'none') return;
@@ -549,6 +593,9 @@
     `).join('');
         }
         setInterval(updateTracker, 1000);
+        window.addEventListener('pagehide', saveLabState);
+        setInterval(saveLabState, 1000);
+        if (currentTask) startTracker(currentTask);
 
         // Draggable Tracker
         let isDraggingTr = false, offsetTr = { x: 0, y: 0 };

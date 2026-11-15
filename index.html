@@ -41,7 +41,7 @@
         </div>
     </div>
     <aside id="sp">
-        <h3>Lab options</h3><button onclick="location.reload()">Reset lab (fresh server)</button>
+        <h3>Lab options</h3><button onclick="resetLab()">Reset lab (fresh server)</button>
         <div style="margin-bottom:10px; display:flex; gap:5px;">
             <button onclick="startTracker(1)" style="width:auto; flex:1; padding:6px 10px; font-size:12px;">Track
                 Activity 1</button>
@@ -100,8 +100,7 @@ Client ping needs: sconfig 4 → Enable server response to Ping.</pre>
     <div id="tracker">
         <div id="tracker-header">
             <span id="tracker-title" style="font-weight:600; font-size:12px;">Task Tracker</span>
-            <span style="cursor:pointer; color:#9aa0a6;"
-                onclick="document.getElementById('tracker').style.display='none'">✕</span>
+            <span style="cursor:pointer; color:#9aa0a6;" onclick="closeTracker()">✕</span>
         </div>
         <div id="tracker-body">
             <ul id="tracker-list" style="margin:0; padding:0; list-style:none;"></ul>
