@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Server Lab</title>
+    <link rel="icon" type="image/png" href="dev-web.ico">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div id="hd"><button class="tab on" id="t0"><i></i><span>Windows Server 2025</span></button><button class="tab"
+            id="t1"><i style="background:#4fb3ff"></i><span>Windows 10 Client</span></button><button id="mn"
+            aria-label="Menu"><b></b><b></b><b></b></button></div>
+    <div id="main">
+        <div class="pg" id="srv">
+            <div id="win">
+                <div id="ti"></div>
+                <div id="term">
+                    <pre id="out"></pre>
+                    <div id="row"><span id="pr"></span><input id="in" autocomplete="off" spellcheck="false"
+                            autocapitalize="off"></div>
+                </div>
+            </div>
+            <div class="watermark">@devenciiGG</div>
+        </div>
+        <div class="pg" id="cli" hidden>
+            <div class="ic" style="top:14px" data-a="ccmd"><u>&gt;_</u>Command Prompt</div>
+            <div class="ic" style="top:100px" data-a="edge"><u>🌐</u>Microsoft Edge</div>
+            <div class="ic" style="top:186px" data-a="expl"><u>📁</u>File Explorer</div>
+            <div id="sm" hidden>
+                <div data-a="ccmd">Command Prompt</div>
+                <div data-a="edge">Microsoft Edge</div>
+                <div data-a="expl">File Explorer</div>
+            </div>
+            <div id="tb"><button id="sb" aria-label="Start"><i></i><i></i><i></i><i></i></button>
+                <div id="ck"></div>
+            </div>
+            <div class="watermark client-watermark">@devenciiGG</div>
+        </div>
+    </div>
+    <aside id="sp">
+        <h3>Lab options</h3><button onclick="location.reload()">Reset lab (fresh server)</button>
+        <div style="margin-bottom:10px; display:flex; gap:5px;">
+            <button onclick="startTracker(1)" style="width:auto; flex:1; padding:6px 10px; font-size:12px;">Track
+                Activity 1</button>
+            <button onclick="startTracker(2)" style="width:auto; flex:1; padding:6px 10px; font-size:12px;">Track
+                Activity 2</button>
+        </div>
+        <p>Server tab: pick numbers in the menu. Option 15 opens the Command Prompt; type <b>sconfig</b> to go back. Any
+            unknown command prints “Command does not exist.”</p>
+
+        <details id="cheat-details">
+            <summary>Command cheat sheet</summary>
+            <div id="pin-prompt" style="padding:10px 0;">
+                <p style="margin-top:0; color:#e8eaed;">Enter PIN to unlock:</p>
+                <input type="password" id="pin-input"
+                    style="width:100%; padding:6px; margin-bottom:8px; background:#1a1b1e; border:1px solid #444; color:#fff; border-radius:4px;">
+                <button onclick="unlockCheat()" style="width:auto; padding:4px 12px; margin-bottom:0;">Unlock</button>
+                <span id="pin-error" style="color:#ff5555; font-size:12px; display:none; margin-left:10px;">Incorrect
+                    PIN</span>
+            </div>
+            <pre id="cheat-content" style="display:none; margin-top:10px;">## Basic Setup (Activity 1)
+New-LocalUser -Name "SysAd" -FullName "System Administrator" -Description "Administrator of this Computer" -Password (ConvertTo-SecureString -AsPlainText "P@ssw0rd01" -Force) -PasswordNeverExpires -AccountNeverExpires
+Net User SysAd
+Add-LocalGroupMember -Group "Administrators" -Member "SysAd"
+Install-WindowsFeature -name AD-Domain-Services -IncludeManagementTools
+Install-ADDSForest   (then answer the prompts)
+Install-WindowsFeature -name Web-Server -IncludeManagementTools
+Invoke-WebRequest http://localhost
+New-SmbShare -Name "mySharedFolder" -Path "C:\inetpub\wwwroot" -FullAccess "Everyone"
+
+## Activity 2: AD OUs, Users, and GPOs
+New-ADOrganizationalUnit -Name "Admin_OU" -Path "DC=srv,DC=world"
+New-ADOrganizationalUnit -Name "Staff_OU" -Path "DC=srv,DC=world"
+New-ADUser -Name "AdminUser" -Path "OU=Admin_OU,DC=srv,DC=world"
+New-ADUser -Name "StaffUser" -Path "OU=Staff_OU,DC=srv,DC=world"
+New-GPO -Name "Admin_GPO"
+New-GPO -Name "Staff_GPO"
+
+## Activity 2: Folder Redirection & Drive Mapping
+New-GPOFolderRedirection -Name "Admin_GPO" -Path "\\192.168.1.10\AdminData" -Access "Full"
+New-GPOFolderRedirection -Name "Staff_GPO" -Path "\\192.168.1.10\StaffData" -Access "Read"
+New-GPODriveMap -Name "Admin_GPO" -Drive "Z:" -Path "\\192.168.1.10\AdminData"
+New-GPODriveMap -Name "Staff_GPO" -Drive "Y:" -Path "\\192.168.1.10\StaffData"
+
+Extras: sconfig, hostname, ipconfig, whoami, Get-Date, Get-SmbShare, cls, exit
+
+Client ping needs: sconfig 4 → Enable server response to Ping.</pre>
+        </details>
+
+        <div
+            style="margin-top:30px; padding-top:15px; border-top:1px solid #444; text-align:center; color:#9aa0a6; font-size:12px;">
+            Created by <b style="color:#4fb3ff;">devenciiGG</b>
+        </div>
+    </aside>
+
+    <div id="tracker">
+        <div id="tracker-header">
+            <span id="tracker-title" style="font-weight:600; font-size:12px;">Task Tracker</span>
+            <span style="cursor:pointer; color:#9aa0a6;"
+                onclick="document.getElementById('tracker').style.display='none'">✕</span>
+        </div>
+        <div id="tracker-body">
+            <ul id="tracker-list" style="margin:0; padding:0; list-style:none;"></ul>
+        </div>
+    </div>
+
+   <script src="dev.js"></script>
+</body>
+
+</html>
